@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "brJ6MyDp/btx85Q9zKWt/cgIgH3h4kAoltFxie2Em85QTkP1KhZYtHvPY1pYVq2F2DsqlidlMvIyWrMHk3QoYg==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\rgabr\\OneDrive\\Documentos\\Github\\teste2\\mqtt-speed-tester\\mqtt-speed-tester.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\rgabr\\.nuget\\packages\\mqttnet\\4.3.3.952\\mqttnet.4.3.3.952.nupkg.sha512",
+    "C:\\Users\\rgabr\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512"
+  ],
+  "logs": []
+}
