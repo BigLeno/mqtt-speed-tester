@@ -24,7 +24,7 @@ public class Program
 
             while (!process.StandardOutput.EndOfStream)
             {   
-                string line = process.StandardOutput.ReadLine();
+                string line = process.StandardOutput.ReadLine()!;
 
                 if (line.Contains("Server:"))
                 {   
