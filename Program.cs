@@ -16,7 +16,7 @@ public class Program
         try
         {
             process.StartInfo.FileName = "speedtest.exe";
-            process.StartInfo.Arguments = "--server-id=seu_id_de_servidor"; // Substitua pelo ID do servidor que você deseja usar ou remova para usar o servidor padrão
+            process.StartInfo.Arguments = "--accept-gdpr --server-id=seu_id_de_servidor"; // Substitua pelo ID do servidor que você deseja usar ou remova para usar o servidor padrão
             process.StartInfo.RedirectStandardOutput = true;
             process.StartInfo.UseShellExecute = false;
 
