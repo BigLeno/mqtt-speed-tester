@@ -1,108 +1,114 @@
+# mqtt-speed-tester
 
-## Sobre o Programa
+Aplicação de console em **.NET 8 (C#)** que mede a velocidade da internet com o [Speedtest CLI](https://www.speedtest.net/apps/cli) e publica o resultado em JSON num broker **MQTT**. Rodando de tempos em tempos, ela permite acompanhar a qualidade da conexão num painel ou disparar alertas quando a velocidade cai.
 
-Este programa é uma aplicação .NET Core que realiza testes de velocidade de internet utilizando a ferramenta Speedtest CLI. Os resultados dos testes são então publicados em um broker MQTT especificado.
+![.NET 8](https://img.shields.io/badge/.NET_8-512BD4?style=flat-square&logo=dotnet&logoColor=white)
+![C#](https://img.shields.io/badge/C%23-239120?style=flat-square&logo=csharp&logoColor=white)
+![MQTT](https://img.shields.io/badge/MQTT-660066?style=flat-square&logo=mqtt&logoColor=white)
 
-O programa requer que você baixe o Speedtest CLI e o coloque na mesma pasta do projeto. Além disso, você precisará fornecer suas próprias credenciais MQTT e o ID do servidor de teste de velocidade.
+## Como funciona
 
-O programa é configurado para executar o teste de velocidade, coletar os resultados e publicá-los no tópico MQTT especificado. Você pode modificar o código para alterar o comportamento conforme necessário.
+```
+Speedtest CLI ──(JSON)──► mqtt-speed-tester ──(JSON)──► broker MQTT ──► painel, alertas, banco
+```
 
+1. Executa o Speedtest CLI com `--format=json`, o que evita depender do layout da saída em texto.
+2. Converte o resultado para unidades fáceis de ler: latência e jitter em ms, download e upload em Mbps.
+3. Publica no tópico configurado com QoS 2 e a flag *retain*, para que quem assinar o tópico depois receba logo o último resultado.
 
-## Download do arquivo necessário
+Exemplo de mensagem publicada:
 
-1. **Baixar o arquivo do Speedtest**
-    Acesse a seguinte URL para fazer o download do arquivo necessário:
+```json
+{
+  "timestamp": "2026-11-03T14:30:12+00:00",
+  "isp": "Provedor Exemplo",
+  "server": "Servidor Exemplo - Natal",
+  "latencyMs": 8.42,
+  "jitterMs": 1.13,
+  "downloadMbps": 487.3,
+  "uploadMbps": 251.06,
+  "packetLossPercent": 0,
+  "resultUrl": "https://www.speedtest.net/result/c/..."
+}
+```
 
-    ```
-    https://www.speedtest.net/apps/cli
-    ```
+## Requisitos
 
-    Após o download, certifique-se de mover o arquivo para a mesma pasta do seu projeto.
+- [.NET 8 SDK](https://dotnet.microsoft.com/download)
+- [Speedtest CLI](https://www.speedtest.net/apps/cli), da Ookla. Ele não é versionado neste repositório: baixe a versão do seu sistema e coloque o executável na pasta do projeto ou informe o caminho em `SPEEDTEST_PATH`.
+- Um broker MQTT (por exemplo, Mosquitto). Opcional: sem ele, o resultado só é exibido no terminal.
 
-    Estando na mesma pasta do projeto, você deve verificar o arquivo como está sendo importado para o projeto.
+## Configuração
 
-    ```csharp
-    process.StartInfo.FileName = "speedtest.exe";
-    ```
+Tudo é configurado por variáveis de ambiente. Nenhuma credencial fica no código.
 
-    O projeto foi desenvolvido em ambiente Windows, já em outros sistemas operacionais, ficaria algo como isso:
+| Variável | Obrigatória | Padrão | Descrição |
+|---|---|---|---|
+| `MQTT_HOST` | não | — | Endereço do broker. Sem ela, o resultado não é publicado. |
+| `MQTT_PORT` | não | `1883` | Porta do broker |
+| `MQTT_USER` / `MQTT_PASSWORD` | não | — | Credenciais do broker, se houver |
+| `MQTT_TOPIC` | não | `speedtest/result` | Tópico de publicação |
+| `MQTT_CLIENT_ID` | não | `mqtt-speed-tester-<máquina>` | Identificador do cliente MQTT |
+| `SPEEDTEST_PATH` | não | `speedtest.exe` (Windows) ou `speedtest` | Caminho do Speedtest CLI |
+| `SPEEDTEST_SERVER_ID` | não | escolha automática | Servidor fixo para os testes (`speedtest --servers` lista os próximos) |
 
-    - Linux e MacOS
-        ```csharp
-        process.StartInfo.FileName = "speedtest";
-        ```
-    
+## Como rodar
 
-## Configuração das credenciais e ID do servidor
+**Linux e macOS**
 
-1. **Modificar as credenciais do MQTT e o ID do servidor de teste de velocidade**
-    Você precisará modificar as credenciais do MQTT e o ID do servidor de teste de velocidade no código do projeto. Localize as linhas de código correspondentes e substitua os valores de placeholder pelos valores corretos.
+```bash
+export MQTT_HOST=localhost
+export MQTT_TOPIC=casa/internet/velocidade
+dotnet run
+```
 
-    Por exemplo, se as credenciais do MQTT estão definidas como:
+**Windows (PowerShell)**
 
-    ```csharp
-    .WithTcpServer("seu_broker_mqtt", 1883)
-    .WithCredentials("seu_usuario", "sua_senha")
-    ```
+```powershell
+$env:MQTT_HOST = "localhost"
+$env:MQTT_TOPIC = "casa/internet/velocidade"
+dotnet run
+```
 
-    Substitua `"seu_broker_mqtt", "seu_usuario"` e `"sua_senha"` pelas suas credenciais reais do MQTT.
+Para conferir a publicação, assine o tópico em outro terminal:
 
-    Você pode modificar o tópico que será publicado no mqtt.
+```bash
+mosquitto_sub -h localhost -t casa/internet/velocidade -v
+```
 
-    ```csharp
-    .WithTopic("seu_tópico")
-    ```
+### Códigos de saída
 
-    Substitua `"seu_tópico"` pelas suas credenciais reais do MQTT.
+| Código | Significado |
+|---|---|
+| `0` | Teste executado e, se configurado, publicado |
+| `1` | Falha no teste de velocidade (CLI ausente, erro ou tempo esgotado) |
+| `2` | Configuração inválida |
+| `3` | Falha ao publicar no broker |
 
-    Da mesma forma, se o ID do servidor de teste de velocidade está definido como:
+Os códigos permitem que um agendador, como o `cron` ou o Agendador de Tarefas do Windows, identifique falhas.
 
-    ```csharp
-    process.StartInfo.Arguments = "--server-id=seu_id_de_servidor";
-    ```
+### Execução periódica
 
-    Substitua `"seu_id_de_servidor"` pelo ID real do seu servidor de teste de velocidade.
+Exemplo com `cron`, a cada 30 minutos, a partir de um build publicado:
 
-    Ou pode comentar a linha de código que ele irá buscar automaticamente o melhor servidor para o teste.
+```bash
+dotnet publish -c Release -o /opt/mqtt-speed-tester
+```
 
+```cron
+*/30 * * * * MQTT_HOST=localhost SPEEDTEST_PATH=/usr/bin/speedtest /opt/mqtt-speed-tester/mqtt-speed-tester
+```
 
+## Estrutura
 
-# Como utilizar o projeto
+```
+Program.cs            fluxo principal e códigos de saída
+AppSettings.cs        leitura e validação das variáveis de ambiente
+SpeedTestRunner.cs    execução do Speedtest CLI, tempo limite e leitura do JSON
+SpeedTestResult.cs    resultado publicado e mapeamento da saída do CLI
+MqttPublisher.cs      conexão e publicação no broker
+```
 
-Siga os passos abaixo para configurar e executar o projeto:
-
-1. **Verificar a instalação do .NET Core**
-    Abra o terminal e digite o seguinte comando:
-
-    ```bash
-        dotnet --version
-    ```
-    
-    Se o .NET Core estiver instalado corretamente, você verá a versão instalada.
-
-2. **Navegar até o diretório do projeto**
-    Utilize o comando `cd` para navegar até o diretório do seu projeto. Por exemplo:
-
-    ```bash
-        cd caminho/para/seu/projeto
-    ```
-
-3. **Adicionar as bibliotecas Newtonsoft.Json e MQTTnet**
-    No terminal, execute os seguintes comandos para adicionar as bibliotecas ao seu projeto:
-
-    ```bash
-        dotnet add package Newtonsoft.Json 
-        dotnet add package MQTTnet
-    ```
-
-4. **Executar o projeto**
-    Finalmente, você pode executar o projeto com o comando `dotnet run`:
-
-    ```bash
-        dotnet run
-    ```
-
-## Direitos Autorais
+## Direitos autorais
 
 Copyright 2024 Rutileno Gabriel
-
