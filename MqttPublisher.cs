@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using MQTTnet;
 using MQTTnet.Client;
@@ -13,6 +14,8 @@ public sealed class MqttPublisher(MqttSettings settings)
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        // Mantém acentos e "&" legíveis no payload (ex.: "Telefônica"), em vez de ô.
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     public async Task PublishAsync(SpeedTestResult result, CancellationToken cancellationToken = default)
