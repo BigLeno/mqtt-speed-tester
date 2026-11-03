@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        run: dotnet build -c Release
+
+      - name: Instala o Speedtest CLI e o Mosquitto
+        run: |
+          curl -fsSL https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-x86_64.tgz \
+            | tar xz -C "$RUNNER_TEMP" speedtest
+          echo "SPEEDTEST_PATH=$RUNNER_TEMP/speedtest" >> "$GITHUB_ENV"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mosquitto mosquitto-clients jq
+          sudo systemctl start mosquitto
+
+      - name: Código de saída 2 com configuração inválida
+        run: |
+          set +e
+          MQTT_HOST=localhost MQTT_PORT=abc dotnet run -c Release --no-build
+          code=$?
+          echo "código de saída: $code"
+          test "$code" -eq 2
+
+      - name: Código de saída 1 sem o Speedtest CLI
+        run: |
+          set +e
+          SPEEDTEST_PATH=/caminho/inexistente dotnet run -c Release --no-build
+          code=$?
+          echo "código de saída: $code"
+          test "$code" -eq 1
+
+      - name: Teste de velocidade e publicação no MQTT
+        env:
+          MQTT_HOST: localhost
+          MQTT_TOPIC: ci/speedtest
+        run: |
+          dotnet run -c Release --no-build
+          # A mensagem é retida, então quem assina depois ainda a recebe.
+          mosquitto_sub -h localhost -t ci/speedtest -C 1 -W 10 > mensagem.json
+          cat mensagem.json
+          jq -e '.downloadMbps > 0 and .uploadMbps > 0 and .latencyMs > 0' mensagem.json
