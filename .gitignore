@@ -1,3 +1,18 @@
-bin
-obj
+# Build do .NET
+bin/
+obj/
 
+# IDEs
+.vs/
+.vscode/
+.idea/
+*.user
+
+# Speedtest CLI: é baixado do site oficial, não versionado
+speedtest
+speedtest.exe
+speedtest.5
+speedtest.md
+
+# Configuração local
+.env
